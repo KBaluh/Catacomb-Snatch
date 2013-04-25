@@ -6,12 +6,14 @@ import com.mojang.mojam.MojamComponent;
 import com.mojang.mojam.gui.components.Button;
 import com.mojang.mojam.gui.components.ClickableComponent;
 import com.mojang.mojam.gui.components.Font;
+import com.mojang.mojam.gui.components.TextInput;
 import com.mojang.mojam.level.LevelList;
 import com.mojang.mojam.screen.Art;
 import com.mojang.mojam.screen.AbstractScreen;
 
-public class JoinGameMenu extends GuiMenu {
-
+public class JoinGameMenu extends GuiMenu {	
+	private TextInput ipInput;
+	
 	private Button joinButton;
 	private Button cancelButton;
 
@@ -21,15 +23,17 @@ public class JoinGameMenu extends GuiMenu {
 		LevelList.createLevelList();
 		joinButton = (Button) addButton(new Button(TitleMenu.PERFORM_JOIN_ID, MojamComponent.texts.getStatic("mp.join"), 100, 180));
 		cancelButton = (Button) addButton(new Button(TitleMenu.CANCEL_JOIN_ID, MojamComponent.texts.getStatic("cancel"), 250, 180));
+		
+		ipInput = new TextInput(TitleMenu.ip, 100,120,278);
+		ipInput.setFixed(true);
 	}
 
 	@Override
-	public void render(AbstractScreen screen) {
-
+	public void render(AbstractScreen screen) {		
 		screen.clear(0);
 		screen.blit(Art.emptyBackground, 0, 0);
 		Font.defaultFont().draw(screen, MojamComponent.texts.getStatic("mp.enterIP"), 100, 100);
-		Font.defaultFont().draw(screen, TitleMenu.ip + "-", 100, 120);
+		ipInput.render(screen);
 
 		super.render(screen);
 	}
@@ -37,14 +41,13 @@ public class JoinGameMenu extends GuiMenu {
 	@Override
 	public void keyPressed(KeyEvent e) {
 		// Start on Enter, Cancel on Escape
-		if ((e.getKeyChar() == KeyEvent.VK_ENTER || e.getKeyCode() == KeyEvent.VK_E)) {
-			if (TitleMenu.ip.length() > 0) {
+		if ((e.getKeyChar() == KeyEvent.VK_ENTER)) {
+			if (ipInput.getContent().length() > 0) {
+				TitleMenu.ip = ipInput.getContent();
 				joinButton.postClick();
 			}
 		} else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
 			cancelButton.postClick();	
-		} else {
-			super.keyPressed(e);
 		}
 	}
 
@@ -54,12 +57,7 @@ public class JoinGameMenu extends GuiMenu {
 
 	@Override
 	public void keyTyped(KeyEvent e) {
-		if (e.getKeyChar() == KeyEvent.VK_BACK_SPACE) {
-			if(TitleMenu.ip.length() > 0)
-				TitleMenu.ip = TitleMenu.ip.substring(0, TitleMenu.ip.length() - 1);
-		} else if(!e.isActionKey()) {
-			TitleMenu.ip += e.getKeyChar();
-		}
+		ipInput.keyTyped(e);
 	}
 
 	@Override

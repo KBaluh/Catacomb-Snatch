@@ -12,7 +12,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.Reader;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -67,7 +66,7 @@ public final class ModSystem {
 	private static Level level;
 	private static InputHandler inputHandler;
 	private static Keys keys;
-	public static Map<Integer, Class> spawnList;
+	public static Map<Integer, Class<?>> spawnList;
 	private static ScriptEngineManager lang;
 	public static boolean isJar;
 	public static boolean isDebug;
@@ -108,12 +107,12 @@ public final class ModSystem {
 		modList = new ArrayList<IMod>();
 		scriptList = new ArrayList<ScriptEngine>();
 		keys = new Keys();
-		spawnList = new HashMap<Integer, Class>();
+		spawnList = new HashMap<Integer, Class<?>>();
 		lang = new ScriptEngineManager();
 		keys.getAll().removeAll(keys.getAll());
 		try {
 			modDir = new File(ModSystem.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-			modsFolder = new File(mojam.getMojamDir(), "/mods/");
+			modsFolder = new File(MojamComponent.getMojamDir(), "/mods/");
 			isJar = modDir.getAbsolutePath().endsWith(".jar");
 			isDebug = !isJar;
 		} catch (URISyntaxException e1) {
@@ -121,16 +120,17 @@ public final class ModSystem {
 		}
 
 		inputHandler = (InputHandler) reflectField(mojam, "inputHandler");
+
+		//needed for mobs to spawn
+		addMod(ModSystem.class.getClassLoader(), "SnatchContent.class");
 		
-	
-			
-			addMod(ModSystem.class.getClassLoader(), "SnatchContent.class");
-			
-			
 		if (Options.getAsBoolean(Options.ENABLE_MODS, Options.VALUE_FALSE)) {
 			System.out.println("ModSystem starting up...");
+
+			
+
 			try {
-				readLinksFromFile(new File(mojam.getMojamDir(), "mods.txt"));
+				readLinksFromFile(new File(MojamComponent.getMojamDir(), "mods.txt"));
 				readFromClassPath(modDir);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -138,13 +138,13 @@ public final class ModSystem {
 		} else {
 			System.out.println("ModSystem disabled...");
 		}
-		
+
 	}
 
 	/**
 	 * Loads all scripts found in the mods folder into the game.
 	 */
-	private static void readFromModsFolder() {
+	protected static void readFromModsFolder() {
 		File[] files = modsFolder.listFiles();
 		boolean valid;
 		for (File f : files) {
@@ -192,7 +192,6 @@ public final class ModSystem {
 				if (file2.isFile()) {
 					FileInputStream fileinputstream = new FileInputStream(file2);
 					ZipInputStream zipinputstream = new ZipInputStream(fileinputstream);
-					Object obj = null;
 					do {
 						ZipEntry zipentry = zipinputstream.getNextEntry();
 						if (zipentry == null) {
@@ -260,7 +259,7 @@ public final class ModSystem {
 				s1 = (new StringBuilder(String.valueOf(package1.getName()))).append(".")
 						.append(s1.substring(s.lastIndexOf('/') + 1)).toString();
 			}
-			Class class1 = classloader.loadClass(s1);
+			Class<?> class1 = classloader.loadClass(s1);
 			if (!(IMod.class).isAssignableFrom(class1)) {
 				return null;
 			}
@@ -291,7 +290,6 @@ public final class ModSystem {
 			System.out.println("Reading from classpath " + file.getAbsolutePath());
 			FileInputStream fileinputstream = new FileInputStream(file);
 			ZipInputStream zipinputstream = new ZipInputStream(fileinputstream);
-			Object obj = null;
 			do {
 				ZipEntry zipentry = zipinputstream.getNextEntry();
 				if (zipentry == null) {
@@ -367,7 +365,7 @@ public final class ModSystem {
 			BufferedOutputStream dest = null;
 			BufferedInputStream is = null;
 			ZipFile zipfile = new ZipFile(modDir.getAbsolutePath());
-			Enumeration e = zipfile.entries();
+			Enumeration<?> e = zipfile.entries();
 			while (e.hasMoreElements()) {
 				entry = (ZipEntry) e.nextElement();
 				System.out.println("Extracting: " + entry);
@@ -390,6 +388,7 @@ public final class ModSystem {
 				System.out.println(engine.getFactory().getExtensions().get(0).toUpperCase() + " Script initialised: "
 						+ s);
 			}
+			zipfile.close();
 		} catch (FileNotFoundException e1) {
 			if (!isJar)
 				e1.printStackTrace();
@@ -455,7 +454,7 @@ public final class ModSystem {
 	 * @return The id of the registered entity
 	 * @see Entity
 	 */
-	public static int addEntity(Class entityClass) {
+	public static int addEntity(Class<?> entityClass) {
 		spawnList.put(spawnList.size(), entityClass);
 		int i = spawnList.size() - 1;
 		System.out.println("Registered " + spawnList.get(i).getSimpleName() + " with id " + i);
@@ -568,7 +567,7 @@ public final class ModSystem {
 	  * }
 	 */
 	public static AbstractBitmap[][] addAnimation(String src) {
-		return mojam.screen.cut(src, 32, 32);
+		return MojamComponent.screen.cut(src, 32, 32);
 	}
 
 	/**
@@ -624,7 +623,7 @@ public final class ModSystem {
 	 *            The parameters of the method
 	 * @return The returned value of the method
 	 */
-	public static Object reflectMethod(Class c, Object o, String s, Object params[]) {
+	public static Object reflectMethod(Class<?> c, Object o, String s, Object params[]) {
 		// Go and find the private method...
 		final Method methods[] = c.getDeclaredMethods();
 		for (int i = 0; i < methods.length; ++i) {
@@ -704,7 +703,7 @@ public final class ModSystem {
 	 *            The name of the variable
 	 * @return The field reflected
 	 */
-	public static Object reflectField(Class c, String s) {
+	public static Object reflectField(Class<?> c, String s) {
 		// Go and find the private fields...
 		final Field fields[] = c.getDeclaredFields();
 		for (int i = 0; i < fields.length; ++i) {
@@ -727,7 +726,7 @@ public final class ModSystem {
 		try {
 			BufferedImage bi = ImageIO.read(MojamComponent.class.getResource(string));
 			if (bi != null) {
-				return  mojam.screen.load(bi);
+				return  MojamComponent.screen.load(bi);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -850,26 +849,22 @@ public final class ModSystem {
 	 */
 	private static void invoke(String s, Object... args) {
 		for (ScriptEngine sc : scriptList) {
-			String sarg = "";
 			if (args.length > 0) {
 				for (Object o : args) {
 					sc.put(o.getClass().getSimpleName(), o);
-					sarg += o.getClass().getSimpleName();
 				}
 			}
 			try {
 				Invocable i = (Invocable) sc;
 				i.invokeFunction(s, args);
-			} catch (NoSuchMethodException e) {
-			} catch (InvokeFailedException e) {
-			} catch (ClassCastException e) {
+			} catch (NoSuchMethodException ignored) {
+			} catch (InvokeFailedException ignored) {
+			} catch (ClassCastException ignored) {
 			} catch (ScriptException e) {
 				System.out.println("Bad method in mod" + " at method " + s + " line: " + e.getLineNumber()
 						+ " column: " + e.getColumnNumber());
 				e.printStackTrace();
-			} catch (Exception e) {
-				// e.printStackTrace();
-			}
+			} catch (Exception ignored) {}
 		}
 	}
 
@@ -952,28 +947,23 @@ public final class ModSystem {
 		List<String> links = Arrays.asList(line.split("\n|\r"));
 		List<String> scripts = new ArrayList<String>();
 		List<String> dependencies = new ArrayList<String>();
-		int i = 0;
+		
 		for (String s : links) {
-			i++;
-			if (s == null || s.startsWith("#"))
+			if (s == null || s.startsWith("#")) {
 				continue;
+			}
 			s.trim();
-			File f1 = new File(mojam.getMojamDir().getAbsolutePath() + "/mods/" + s.substring(s.lastIndexOf('/') + 1));
 			try {
 				if (s.charAt(0) == '~') {
 					dependencies.add(readMod(s.charAt(0), s.substring(1)));
 				} else {
 					scripts.add(readMod(s.charAt(0), s.substring(1)));
 				}
-			} catch (Exception e) {
-
-			}
+			} catch (Exception ignored) {}
 		}
-		i = 1;
 
 		for (String s : scripts) {
 			if (s != null) {
-				i++;
 				try {
 					if (s.endsWith(".class")) {
 						addMod(ModSystem.class.getClassLoader(), s);
@@ -998,7 +988,7 @@ public final class ModSystem {
 	 * @throws IOException
 	 */
 	private static String readMod(char command, String url) throws IOException {
-		File f1 = new File(mojam.getMojamDir().getAbsolutePath() + "/mods/" + url.substring(url.lastIndexOf('/') + 1));
+		File f1 = new File(MojamComponent.getMojamDir().getAbsolutePath() + "/mods/" + url.substring(url.lastIndexOf('/') + 1));
 		if (command == '+' || command == '~') {
 			f1.createNewFile();
 			File f2 = downloadFile(url, f1.getAbsolutePath());
@@ -1033,6 +1023,7 @@ public final class ModSystem {
 			stringBuilder.append(line);
 			stringBuilder.append(ls);
 		}
+		reader.close();
 		return stringBuilder.toString();
 	}
 
@@ -1066,12 +1057,13 @@ public final class ModSystem {
 		}
 	}
 
-	private static boolean upToDate(String s) throws IOException {
+	protected static boolean upToDate(String s) throws IOException {
 		File f = new File(s);
-		File f1 = new File(mojam.getMojamDir(), "mods/" + s.substring(s.lastIndexOf('/') + 1));
-		if (!f1.exists())
+		File f1 = new File(MojamComponent.getMojamDir(), "mods/" + s.substring(s.lastIndexOf('/') + 1));
+		if (!f1.exists()) {
 			f1.mkdirs();
-		f1.createNewFile();
+			f1.createNewFile();
+		}
 		if (f.hashCode() == f1.hashCode() && f.lastModified() == f1.lastModified()) {
 			return true;
 		}
@@ -1089,16 +1081,17 @@ public final class ModSystem {
 	 * @throws IOException
 	 */
 	public static File downloadFile(String path, String dest) throws IOException {
-		File f, f1;
-		f = new File(path);
-		f1 = new File(dest);
-		if (!f1.exists() && !f1.createNewFile())
-			throw new IOException("Could not create file at " + f1.getCanonicalPath());
+		File f;
+		f = new File(dest);
+		if (!f.exists() && !f.createNewFile()) {
+			throw new IOException("Could not create file at " + f.getCanonicalPath());
+		}
 		URL url = new URL(path);
 		ReadableByteChannel rbc = Channels.newChannel(url.openStream());
-		FileOutputStream fos = new FileOutputStream(f1);
+		FileOutputStream fos = new FileOutputStream(f);
 		fos.getChannel().transferFrom(rbc, 0, 1 << 24);
 		System.out.println("Downloaded to: " + dest);
+		fos.close();
 		return new File(dest);
 	}
 
@@ -1113,7 +1106,7 @@ public final class ModSystem {
 		return (long) d;
 	}
 
-	private static void printAllLangFactories() {
+	protected static void printAllLangFactories() {
 		for (ScriptEngineFactory sef : lang.getEngineFactories()) {
 			for (String s : sef.getExtensions()) {
 				System.out.println(s);
@@ -1148,5 +1141,4 @@ public final class ModSystem {
 			}
 		}
 	}
-
 }

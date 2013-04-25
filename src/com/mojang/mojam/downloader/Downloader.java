@@ -4,13 +4,12 @@ import java.net.*;
 import java.io.*;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.jar.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import com.mojang.mojam.MojamComponent;
 import com.mojang.mojam.MojamStartup;
 import com.mojang.mojam.Options;
-import com.mojang.mojam.mc.EnumOS2;
 import com.mojang.mojam.mc.EnumOSMappingHelper;
 
 import com.mojang.mojam.gui.DownloadScreen;
@@ -81,7 +80,7 @@ public class Downloader {
 		MojamStartup.instance.startgame();
 	}
 
-	private static void testSpeeds() {
+	public static void testSpeeds() {
 		IDownloader old = downloadAgent;
 		downloadAgent = new DefaultDownloader();
 		long startDefault = System.nanoTime();
@@ -432,38 +431,54 @@ public class Downloader {
 
 	// unpack jar
 
-	public static void unpackJar(String jarFile, String destDir) {
+	public static boolean unpackJar(String jarFile, String destDir) {
 		DownloadScreen.unpackStart(new File(jarFile).getName().toString());
-		try {
-			JarFile jar = new JarFile(jarFile);
-			Enumeration<JarEntry> enumi = jar.entries();
+		
+		File jarFileJar = new File(jarFile);
+		File destDirDir = new File(destDir);
 
-			while (enumi.hasMoreElements()) {
-				JarEntry file = (JarEntry) enumi.nextElement();
-				File f = new File(destDir + File.separator + file.getName());
-				if (file.isDirectory()) { // if its a directory, create it
-					f.mkdir();
+		if (!destDirDir.isDirectory()) {
+			destDirDir.mkdirs();
+		}
+
+		FileInputStream input;
+		try	{
+			input = new FileInputStream(jarFileJar);
+		} catch (FileNotFoundException e) { return false; }
+
+		ZipInputStream zipIn = new ZipInputStream(input); 
+		try {
+			ZipEntry currentEntry = zipIn.getNextEntry();
+			while (currentEntry != null) {
+				if (currentEntry.getName().contains("META-INF")) {
+					currentEntry = zipIn.getNextEntry();
 					continue;
 				}
-				InputStream is = jar.getInputStream(file); // get the
-				// input
-				// stream
-				FileOutputStream fos = new FileOutputStream(f);
-				byte[] buffer = new byte[1 << Options.getAsInteger(Options.DLBUFFERSIZE, 13)];
-				System.out.println(buffer.length);
-				int read;
 
-				while ((read = is.read(buffer)) != -1) {
-					fos.write(buffer, 0, read);
+				FileOutputStream outStream = new FileOutputStream(new File(destDirDir, currentEntry.getName()));
+
+				int readLen;
+				byte[] buffer = new byte[1024];
+				while ((readLen = zipIn.read(buffer, 0, buffer.length)) > 0) {
+					outStream.write(buffer, 0, readLen);
 				}
-				fos.close();
-				is.close();
+				outStream.close();
+
+				currentEntry = zipIn.getNextEntry();
 			}
-		} catch (Exception e) {
-			DownloadScreen.unpackStop();
-			e.printStackTrace();
+		} catch (IOException e) {
+			return false;
+		} finally {
+			try {
+				DownloadScreen.unpackStop();
+				zipIn.close();
+				input.close();
+			} catch (IOException e) { }
 		}
+
+		jarFileJar.delete();
 		DownloadScreen.unpackStop();
+		return true;
 	}
 
 	// download
